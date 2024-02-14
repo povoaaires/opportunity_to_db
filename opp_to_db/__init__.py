@@ -1,6 +1,8 @@
 import logging
 import pyodbc
 import json
+import os
+import fstrings
 import azure.functions as func
 from datetime import datetime
 
@@ -19,39 +21,42 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
              status_code=500
         )
     
-
     try:
         query = f"SELECT CPF from Clientes where CPF = '{req['Cpf']}';"
-        row = ConectSql('dml',query)
-        if row == None:
-            query = f"INSERT INTO Clientes ([Nome],[Sobrenome],[Email],[Telefone],[DataNascimento],[Endereco],\
-                [Cidade],[Estado],[CEP],[Pais],[DataCadastro],[CPF])\
-                    VALUES ({req['NomePessoa']},{req['NomePessoa'].split(" ")[1]},{req['Email']}, \
-                        {req['Telefone']},{req['DataNascimento']},{req['Endereco']},{req['Cidade']},\
-                            {req['Estado']},{req['CEP']},{str(datetime.now())},{req['NomePessoa']},{req['Cpf']})"
-            
-            row = ConectSql('ddl',query)
-            print(row)
-            
-    except:
-        pass
+        cursor = ConectSql()
+        cursor.execute(query) 
+        row = cursor.fetchone()
 
-
-
-
-
-def ConectSql(tipo,query):
-    try:
-        cnxn = pyodbc.connect("DRIVER={ODBC Driver 17 for SQL Server};SERVER=NTB-64VKH93\SQLEXPRESS;DATABASE=crm_auto_fast;Trusted_Connection=yes;")
-        cursor = cnxn.cursor()  
-        if tipo == 'ddl':
-            count = cursor.execute(query).rowcount
-            cnxn.commit()
+        if str(row) == 'None':
+            date_today = datetime.today()
+            insert = "INSERT INTO Clientes ([Nome],[Sobrenome],[Email],[Telefone],[DataNascimento],[Endereco],[Cidade],[Estado],[CEP],[Pais],[CPF]) VALUES (?,?,?,?,?,?,?,?,?,?,?)"
+            cursor = ConectSql()
+            count = cursor.execute(insert,req['NomePessoa'],req['NomePessoa'],req['Email'],req['Telefone'],req['DataNasc'],req['Endereco'],req['Cidade'],req['Estado'],req['CEP'],req['Pais'],req['Cpf']).rowcount
+            count.commit()
             fim = str(count)
-            return fim
-        elif tipo == 'dml':
-            cursor.execute(query) 
-            row = cursor.fetchone() 
-            return str(row)
+            variavel_teste = 2
+            if fim >= 1:
+                logging.info("Cliente criado com Sucesso na base")
+            else:
+                logging.info("Falha ao criar o cliente na base")
+                
+
+                        
+            
+            # row = ConectSql('ddl',query)
+            # print(row)
+            
+    except Exception as ex:
+        print(ex)
+
+
+
+
+
+def ConectSql():
+    try:
+        cnxn = pyodbc.connect(os.environ["connectionDB"])
+        cursor = cnxn.cursor()  
+        return cursor
     except Exception as ex:
         return ex
